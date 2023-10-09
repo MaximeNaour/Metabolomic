@@ -81,29 +81,36 @@ class ProcessFiles:
             signal_mass = signal_row['Mass']
             confidences = []
             lipid_names = []
+            exact_masses = []
+            adducts = []
 
             for _, lipid_row in lipid_data.iterrows():
                 lipid_name = lipid_row['Lipid name']
                 lipid_mass = lipid_row['Exact Mass']
+                adduct = lipid_row['Adduct']
+                exact_mass = lipid_row['Exact Mass']
                 confidence = (signal_mass - lipid_mass) / signal_mass * 1000000
-                if -5 <= confidence <= 5:  # Filter confidences between -5 and 5
+                if -5 <= confidence <= 5:
                     confidences.append(confidence)
                     lipid_names.append(lipid_name)
+                    exact_masses.append(exact_mass)
+                    adducts.append(adduct)
 
-            # Sort lipids by confidence, in descending order
             sorted_indices = sorted(range(len(confidences)), key=lambda k: confidences[k], reverse=True)
             sorted_lipid_names = [lipid_names[i] for i in sorted_indices]
+            sorted_exact_masses = [str(exact_masses[i]) for i in sorted_indices]
+            sorted_adducts = [adducts[i] for i in sorted_indices]
             sorted_confidences = [confidences[i] for i in sorted_indices]
 
             confidence_strings = map(lambda x: str(round(x, 2)), sorted_confidences)
             confidence_string = ' > '.join(confidence_strings)
 
-            results.append([signal_name, signal_mass, ' > '.join(sorted_lipid_names), confidence_string])
+            results.append([signal_name, signal_mass, ' > '.join(sorted_lipid_names), ' > '.join(sorted_exact_masses), ' > '.join(sorted_adducts), confidence_string])
 
         return results
 
     def save_results(self, results):
-        output_df = pd.DataFrame(results, columns=['Signal name', 'Mass', 'Lipid name', 'Confidence'])
+        output_df = pd.DataFrame(results, columns=['Signal name', 'Mass', 'Lipid name', 'Exact Mass', 'Adduct', 'Confidence']) 
         base_name, extension = os.path.splitext(self.file_name)
         output_file = os.path.join(self.output_path, f"Processed_{base_name}.xlsx")
 
@@ -128,23 +135,24 @@ class ProcessFiles:
         # Access the Excel sheet to adjust column widths and align cells to the left
         for column_cells in sheet.columns:
             length = max(len(str(cell.value)) for cell in column_cells)
-            sheet.column_dimensions[column_cells[0].column_letter].width = length + 2  # Add space for better spacing
-            
+            sheet.column_dimensions[column_cells[0].column_letter].width = length + 2
+
             # Align all cells to the left, except the first row
             for i, cell in enumerate(column_cells):
-                if cell.row == 1:  # Check if it's the first row
-                    cell.alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')  # Center headers
+                if cell.row == 1:
+                    cell.alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
                 else:
-                    cell.alignment = openpyxl.styles.Alignment(horizontal='left', vertical='center')  # Align other cells to the left
+                    cell.alignment = openpyxl.styles.Alignment(horizontal='left', vertical='center')
 
         # Save the Excel workbook
         workbook.save(output_file)
         print(f"Results saved in: {output_file}")
 
+
     def run_process(self):
         self.get_file_names()
         file_name = self.write_file_name()
-        lipid_data_columns = ['Lipid name', 'Exact Mass']
+        lipid_data_columns = ['Lipid name', 'Exact Mass', 'Adduct']
         signal_data_columns = ['Signal name', 'Mass']
         lipid_data = self.read_data_from_excel(file_name, self.lipid_sheet_name, lipid_data_columns)
         signal_data = self.read_data_from_excel(file_name, self.signal_sheet_name, signal_data_columns)
